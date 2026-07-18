@@ -137,10 +137,50 @@ async function streamChat(message,bubble){
   if(conversationId)body.conversation_id=conversationId;
   const response=await fetch('/api/chat',{method:'POST',headers:{'Authorization':`Bearer ${config.token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(!response.ok)throw new Error(`API 错误: ${response.status}`);
-  const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',fullText='',typingRemoved=false;
-  while(true){const{done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split('\n');buffer=lines.pop()||'';
-    for(const line of lines){if(line.startsWith('event:'))continue;if(line.startsWith('data:')){const d=line.slice(5).trim();if(d==='[DONE]')continue;try{const data=JSON.parse(d);if(data.conversation_id&&!conversationId){conversationId=data.conversation_id;localStorage.setItem(CONV_ID_KEY,conversationId)}if(data.type==='answer'&&data.content){if(!typingRemoved){const t=document.getElementById('typing');if(t)t.remove();typingRemoved=true}fullText+=data.content;bubble.textContent=fullText;scrollToBottom()}if(data.status==='completed'&&data.conversation_id){conversationId=data.conversation_id;localStorage.setItem(CONV_ID_KEY,conversationId)}}catch(e){}}}}
-  if(!typingRemoved){const t=document.getElementById('typing');if(t)t.remove();if(!fullText)bubble.textContent='...'}}
+  const reader=response.body.getReader(),decoder=new TextDecoder();
+  let buffer='',fullText='',typingRemoved=false,currentEvent='';
+
+  while(true){
+    const{done,value}=await reader.read();
+    if(done)break;
+    buffer+=decoder.decode(value,{stream:true});
+    const lines=buffer.split('\n');
+    buffer=lines.pop()||'';
+
+    for(const line of lines){
+      if(line.startsWith('event:')){
+        currentEvent=line.slice(6).trim();
+        continue;
+      }
+      if(line.startsWith('data:')){
+        const d=line.slice(5).trim();
+        if(d==='[DONE]')continue;
+        try{
+          const data=JSON.parse(d);
+
+          // Capture conversation_id from any event
+          if(data.conversation_id){
+            conversationId=data.conversation_id;
+            localStorage.setItem(CONV_ID_KEY,conversationId);
+          }
+
+          // Only process delta events for streaming text
+          if(currentEvent==='conversation.message.delta'&&data.type==='answer'&&data.content){
+            if(!typingRemoved){
+              const t=document.getElementById('typing');
+              if(t)t.remove();
+              typingRemoved=true;
+            }
+            fullText+=data.content;
+            bubble.textContent=fullText;
+            scrollToBottom();
+          }
+        }catch(e){}
+      }
+    }
+  }
+  if(!typingRemoved){const t=document.getElementById('typing');if(t)t.remove();if(!fullText)bubble.textContent='...'}
+}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')updateLastActive()});
 updateLastActive();
 </script>
