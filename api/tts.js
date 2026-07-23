@@ -34,7 +34,8 @@ export default async function handler(req) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer;${token}`,
-        'Resource-Id': 'volc.megatts.default'
+        'Resource-Id': 'volc.megatts.voiceclone'
+'
       },
       body: JSON.stringify(ttsBody)
     });
