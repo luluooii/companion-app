@@ -55,7 +55,7 @@ html,body{height:100%;overflow:hidden;font-family:'Noto Sans SC',-apple-system,s
 .welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-dim);text-align:center;padding:40px;gap:10px}
 .welcome-avatar{width:60px;height:60px;border-radius:50%;object-fit:cover;margin-bottom:8px;border:2px solid var(--border)}
 .welcome-text{font-size:13px;line-height:1.8;max-width:240px}
-.toast{position:fixed;top:calc(20px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%) translateY(-100px);background:#2a1a1a;color:#e88;padding:10px 20px;border-radius:12px;font-size:13px;border:1px solid #3a2020;transition:transform .3s;z-index:100}
+.toast{position:fixed;top:calc(20px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%) translateY(-100px);background:#2a1a1a;color:#e88;padding:10px 20px;border-radius:12px;font-size:13px;border:1px solid #3a2020;transition:transform .3s;z-index:100;max-width:90%;text-align:center}
 .toast.show{transform:translateX(-50%) translateY(0)}
 .config-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;backdrop-filter:blur(4px)}
 .config-overlay.show{display:flex;align-items:flex-end}
@@ -64,7 +64,7 @@ html,body{height:100%;overflow:hidden;font-family:'Noto Sans SC',-apple-system,s
 .config-panel h3{font-size:15px;font-weight:400;margin-bottom:16px}
 .config-section{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border)}
 .config-section:last-child{border-bottom:none}
-.config-section-title{font-size:12px;color:var(--accent);margin-bottom:10px;letter-spacing:.5px;text-transform:uppercase}
+.config-section-title{font-size:12px;color:var(--accent);margin-bottom:10px;letter-spacing:.5px}
 .config-field{margin-bottom:12px}
 .config-field label{display:block;font-size:12px;color:var(--text-secondary);margin-bottom:5px}
 .config-field input{width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-family:'SF Mono','Fira Code',monospace;font-size:12px;outline:none}
@@ -147,8 +147,7 @@ html,body{height:100%;overflow:hidden;font-family:'Noto Sans SC',-apple-system,s
 </div>
 </div>
 <script>
-// ── Storage keys ──
-const KEYS = {
+var KEYS = {
   config: 'comp_config',
   lastActive: 'comp_last_active',
   convId: 'comp_conv_id',
@@ -158,93 +157,78 @@ const KEYS = {
   bg: 'comp_bg'
 };
 
-// ── State ──
-let config = loadConfig();
-let conversationId = localStorage.getItem(KEYS.convId) || '';
-let isStreaming = false;
-let chatHistory = loadHistory();
-let currentAudio = null;
-const USER_ID = localStorage.getItem(KEYS.uid) || (() => { const id = 'u_' + Date.now(); localStorage.setItem(KEYS.uid, id); return id; })();
+var config = loadConfig();
+var conversationId = localStorage.getItem(KEYS.convId) || '';
+var isStreaming = false;
+var chatHistory = loadHistory();
+var currentAudio = null;
+var audioUnlocked = false;
+var uid = localStorage.getItem(KEYS.uid);
+if (!uid) { uid = 'u_' + Date.now(); localStorage.setItem(KEYS.uid, uid); }
+var USER_ID = uid;
 
 function loadConfig() {
-  try { const r = localStorage.getItem(KEYS.config); if (r) return JSON.parse(r); } catch(e) {}
+  try { var r = localStorage.getItem('comp_config'); if (r) return JSON.parse(r); } catch(e) {}
   return { botId:'', token:'', name:'易遇', ttsAppId:'', ttsToken:'', ttsSpeaker:'' };
 }
-function saveConfigToStorage(c) { config = c; localStorage.setItem(KEYS.config, JSON.stringify(c)); }
-function loadHistory() { try { const r = localStorage.getItem(KEYS.history); if (r) return JSON.parse(r); } catch(e) {} return []; }
+function saveConfigToStorage(c) { config = c; localStorage.setItem('comp_config', JSON.stringify(c)); }
+function loadHistory() { try { var r = localStorage.getItem('comp_history'); if (r) return JSON.parse(r); } catch(e) {} return []; }
 function saveHistory() {
-  // Keep last 100 messages
   if (chatHistory.length > 100) chatHistory = chatHistory.slice(-100);
-  localStorage.setItem(KEYS.history, JSON.stringify(chatHistory));
+  localStorage.setItem('comp_history', JSON.stringify(chatHistory));
 }
 
-// ── Init UI ──
-const msgContainer = document.getElementById('msgContainer');
-const inputField = document.getElementById('inputField');
-const btnSend = document.getElementById('btnSend');
-let lastMessageTime = null;
+var msgContainer = document.getElementById('msgContainer');
+var inputField = document.getElementById('inputField');
+var btnSend = document.getElementById('btnSend');
+var lastMessageTime = null;
 
 function initUI() {
   document.getElementById('headerTitle').textContent = config.name || '易遇';
-
-  // Load avatar
-  const avatarData = localStorage.getItem(KEYS.avatar);
+  var avatarData = localStorage.getItem(KEYS.avatar);
   if (avatarData) {
     document.getElementById('headerAvatar').src = avatarData;
     document.getElementById('headerAvatar').style.display = 'block';
     document.getElementById('welcomeAvatar').src = avatarData;
     document.getElementById('welcomeAvatar').style.display = 'block';
   }
-
-  // Load bg
-  const bgData = localStorage.getItem(KEYS.bg);
+  var bgData = localStorage.getItem(KEYS.bg);
   if (bgData) {
-    document.getElementById('bgImage').style.backgroundImage = `url(${bgData})`;
+    document.getElementById('bgImage').style.backgroundImage = 'url(' + bgData + ')';
   }
-
-  // Fill config fields
   document.getElementById('cfgBotId').value = config.botId || '';
   document.getElementById('cfgToken').value = config.token || '';
   document.getElementById('cfgName').value = config.name || '';
   document.getElementById('cfgTtsAppId').value = config.ttsAppId || '';
   document.getElementById('cfgTtsToken').value = config.ttsToken || '';
   document.getElementById('cfgTtsSpeaker').value = config.ttsSpeaker || '';
-
-  if (!config.botId || !config.token) setTimeout(() => toggleConfig(true), 500);
-
-  // Restore chat history
+  if (!config.botId || !config.token) setTimeout(function() { toggleConfig(true); }, 500);
   if (chatHistory.length > 0) {
     document.getElementById('welcome').style.display = 'none';
-    chatHistory.forEach(msg => {
-      addTimeDivider(new Date(msg.time));
-      renderMessage(msg.role, msg.text, msg.id, false);
-    });
+    for (var i = 0; i < chatHistory.length; i++) {
+      addTimeDivider(new Date(chatHistory[i].time));
+      renderMessage(chatHistory[i].role, chatHistory[i].text, chatHistory[i].id, false);
+    }
     scrollToBottom();
   }
 }
 
-// ── Config panel ──
-document.getElementById('btnConfig').addEventListener('click', () => toggleConfig(true));
-document.getElementById('configOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) toggleConfig(false); });
-
-document.getElementById('btnSaveConfig').addEventListener('click', () => {
-  const botId = document.getElementById('cfgBotId').value.trim();
-  const token = document.getElementById('cfgToken').value.trim();
-  const name = document.getElementById('cfgName').value.trim();
-  const ttsAppId = document.getElementById('cfgTtsAppId').value.trim();
-  const ttsToken = document.getElementById('cfgTtsToken').value.trim();
-  const ttsSpeaker = document.getElementById('cfgTtsSpeaker').value.trim();
-
+document.getElementById('btnConfig').addEventListener('click', function() { toggleConfig(true); });
+document.getElementById('configOverlay').addEventListener('click', function(e) { if (e.target === e.currentTarget) toggleConfig(false); });
+document.getElementById('btnSaveConfig').addEventListener('click', function() {
+  var botId = document.getElementById('cfgBotId').value.trim();
+  var token = document.getElementById('cfgToken').value.trim();
+  var name = document.getElementById('cfgName').value.trim();
+  var ttsAppId = document.getElementById('cfgTtsAppId').value.trim();
+  var ttsToken = document.getElementById('cfgTtsToken').value.trim();
+  var ttsSpeaker = document.getElementById('cfgTtsSpeaker').value.trim();
   if (!botId || !token) { showToast('请填写 Bot ID 和 Token'); return; }
-
-  saveConfigToStorage({ botId, token, name: name || '易遇', ttsAppId, ttsToken, ttsSpeaker });
+  saveConfigToStorage({ botId: botId, token: token, name: name || '易遇', ttsAppId: ttsAppId, ttsToken: ttsToken, ttsSpeaker: ttsSpeaker });
   document.getElementById('headerTitle').textContent = name || '易遇';
-
-  // Handle avatar upload
-  const avatarFile = document.getElementById('cfgAvatar').files[0];
+  var avatarFile = document.getElementById('cfgAvatar').files[0];
   if (avatarFile) {
-    const reader = new FileReader();
-    reader.onload = e => {
+    var reader = new FileReader();
+    reader.onload = function(e) {
       localStorage.setItem(KEYS.avatar, e.target.result);
       document.getElementById('headerAvatar').src = e.target.result;
       document.getElementById('headerAvatar').style.display = 'block';
@@ -253,99 +237,101 @@ document.getElementById('btnSaveConfig').addEventListener('click', () => {
     };
     reader.readAsDataURL(avatarFile);
   }
-
-  // Handle bg upload
-  const bgFile = document.getElementById('cfgBg').files[0];
+  var bgFile = document.getElementById('cfgBg').files[0];
   if (bgFile) {
-    const reader = new FileReader();
-    reader.onload = e => {
+    var reader2 = new FileReader();
+    reader2.onload = function(e) {
       localStorage.setItem(KEYS.bg, e.target.result);
-      document.getElementById('bgImage').style.backgroundImage = `url(${e.target.result})`;
+      document.getElementById('bgImage').style.backgroundImage = 'url(' + e.target.result + ')';
     };
-    reader.readAsDataURL(bgFile);
+    reader2.readAsDataURL(bgFile);
   }
-
   toggleConfig(false);
 });
 
 function toggleConfig(s) { document.getElementById('configOverlay').classList.toggle('show', s); }
 
-// ── Input handling ──
-inputField.addEventListener('input', () => {
+inputField.addEventListener('input', function() {
   inputField.style.height = 'auto';
   inputField.style.height = Math.min(inputField.scrollHeight, 100) + 'px';
   btnSend.classList.toggle('active', inputField.value.trim().length > 0);
 });
-inputField.addEventListener('keydown', e => {
+inputField.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendMessage(); }
 });
 btnSend.addEventListener('click', sendMessage);
 
-// ── Time helpers ──
+// Unlock audio on first user interaction
+document.addEventListener('click', function() {
+  if (!audioUnlocked) {
+    var silence = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dX/////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+M4xAANaAKsAAAAACIAA/8AAAAAT//M4xBAAAA0gAAAAAPE');
+    silence.play().catch(function(){});
+    audioUnlocked = true;
+  }
+}, { once: true });
+
 function formatTime(d) { return d.toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit', hour12:false }); }
 function formatTimeDiff(ms) {
-  const m = Math.floor(ms/60000), h = Math.floor(m/60), d = Math.floor(h/24);
-  if (d > 0) return `${d}天${h%24}小时`; if (h > 0) return `${h}小时${m%60}分钟`; if (m > 0) return `${m}分钟`; return '刚刚';
+  var m = Math.floor(ms/60000), h = Math.floor(m/60), d = Math.floor(h/24);
+  if (d > 0) return d + '天' + (h%24) + '小时';
+  if (h > 0) return h + '小时' + (m%60) + '分钟';
+  if (m > 0) return m + '分钟';
+  return '刚刚';
 }
 function getTimeDiffText() {
-  const l = localStorage.getItem(KEYS.lastActive); if (!l) return null;
-  const d = Date.now() - parseInt(l); if (d < 60000) return null; return formatTimeDiff(d);
+  var l = localStorage.getItem(KEYS.lastActive); if (!l) return null;
+  var d = Date.now() - parseInt(l); if (d < 60000) return null; return formatTimeDiff(d);
 }
 function updateLastActive() { localStorage.setItem(KEYS.lastActive, Date.now().toString()); }
 
 function addTimeDivider(date) {
-  const now = new Date(), isToday = date.toDateString() === now.toDateString();
-  const text = isToday ? formatTime(date) : `${date.getMonth()+1}/${date.getDate()} ${formatTime(date)}`;
+  var now = new Date(), isToday = date.toDateString() === now.toDateString();
+  var text = isToday ? formatTime(date) : (date.getMonth()+1) + '/' + date.getDate() + ' ' + formatTime(date);
   if (lastMessageTime && (date - lastMessageTime) < 300000) return;
-  const div = document.createElement('div'); div.className = 'time-divider'; div.textContent = text;
+  var div = document.createElement('div'); div.className = 'time-divider'; div.textContent = text;
   msgContainer.appendChild(div); lastMessageTime = date;
 }
 
-// ── Message rendering ──
 function genId() { return 'm_' + Date.now() + '_' + Math.random().toString(36).substr(2,6); }
+function hideWelcome() { var w = document.getElementById('welcome'); if (w) w.style.display = 'none'; }
 
-function hideWelcome() { const w = document.getElementById('welcome'); if (w) w.style.display = 'none'; }
-
-function renderMessage(role, text, id, animate = true) {
-  const msgDiv = document.createElement('div');
-  msgDiv.className = `msg ${role}`;
-  msgDiv.dataset.id = id;
+function renderMessage(role, text, id, animate) {
+  var msgDiv = document.createElement('div');
+  msgDiv.className = 'msg ' + role;
+  msgDiv.setAttribute('data-id', id);
   if (!animate) msgDiv.style.animation = 'none';
 
   if (role === 'ai') {
-    const avatarData = localStorage.getItem(KEYS.avatar);
+    var avatarData = localStorage.getItem(KEYS.avatar);
     if (avatarData) {
-      const av = document.createElement('img'); av.className = 'msg-avatar'; av.src = avatarData;
+      var av = document.createElement('img'); av.className = 'msg-avatar'; av.src = avatarData;
       msgDiv.appendChild(av);
     }
   }
 
-  const content = document.createElement('div'); content.className = 'msg-content';
-  const bubble = document.createElement('div'); bubble.className = 'msg-bubble'; bubble.textContent = text;
+  var content = document.createElement('div'); content.className = 'msg-content';
+  var bubble = document.createElement('div'); bubble.className = 'msg-bubble'; bubble.textContent = text;
   content.appendChild(bubble);
 
-  // Action buttons
-  const actions = document.createElement('div'); actions.className = 'msg-actions';
+  var actions = document.createElement('div'); actions.className = 'msg-actions';
 
   if (role === 'ai') {
-    // Play voice button
     if (config.ttsAppId && config.ttsToken && config.ttsSpeaker) {
-      const playBtn = document.createElement('button'); playBtn.className = 'msg-action-btn';
+      var playBtn = document.createElement('button'); playBtn.className = 'msg-action-btn';
       playBtn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>播放';
-      playBtn.onclick = () => playVoice(text, playBtn);
+      playBtn.onclick = function() { playVoice(text, playBtn); };
       actions.appendChild(playBtn);
     }
-    // Regenerate button
-    const regenBtn = document.createElement('button'); regenBtn.className = 'msg-action-btn';
+    var regenBtn = document.createElement('button'); regenBtn.className = 'msg-action-btn';
     regenBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>重新生成';
-    regenBtn.onclick = () => regenerateMessage(id);
+    regenBtn.onclick = function() { regenerateMessage(id); };
     actions.appendChild(regenBtn);
   }
 
   if (role === 'user') {
-    const editBtn = document.createElement('button'); editBtn.className = 'msg-action-btn';
+    var editBtn = document.createElement('button'); editBtn.className = 'msg-action-btn';
     editBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>编辑';
-    editBtn.onclick = () => openEditPanel(id, text);
+    editBtn.onclick = function() { openEditPanel(id, text); };
     actions.appendChild(editBtn);
   }
 
@@ -357,60 +343,56 @@ function renderMessage(role, text, id, animate = true) {
 
 function addMessage(role, text) {
   hideWelcome();
-  const now = new Date();
+  var now = new Date();
   addTimeDivider(now);
-  const id = genId();
-  const bubble = renderMessage(role, text, id);
-  chatHistory.push({ role, text, id, time: now.getTime() });
+  var id = genId();
+  var bubble = renderMessage(role, text, id, true);
+  chatHistory.push({ role: role, text: text, id: id, time: now.getTime() });
   saveHistory();
   scrollToBottom();
-  return { bubble, id };
+  return { bubble: bubble, id: id };
 }
 
 function addStreamingMessage() {
   hideWelcome();
   addTimeDivider(new Date());
-  const id = genId();
-  const msgDiv = document.createElement('div'); msgDiv.className = 'msg ai'; msgDiv.dataset.id = id;
+  var id = genId();
+  var msgDiv = document.createElement('div'); msgDiv.className = 'msg ai'; msgDiv.setAttribute('data-id', id);
 
-  const avatarData = localStorage.getItem(KEYS.avatar);
+  var avatarData = localStorage.getItem(KEYS.avatar);
   if (avatarData) {
-    const av = document.createElement('img'); av.className = 'msg-avatar'; av.src = avatarData;
+    var av = document.createElement('img'); av.className = 'msg-avatar'; av.src = avatarData;
     msgDiv.appendChild(av);
   }
 
-  const content = document.createElement('div'); content.className = 'msg-content';
-  const bubble = document.createElement('div'); bubble.className = 'msg-bubble';
-  const typing = document.createElement('div'); typing.className = 'typing-indicator'; typing.id = 'typing';
+  var content = document.createElement('div'); content.className = 'msg-content';
+  var bubble = document.createElement('div'); bubble.className = 'msg-bubble';
+  var typing = document.createElement('div'); typing.className = 'typing-indicator'; typing.id = 'typing';
   typing.innerHTML = '<span></span><span></span><span></span>';
   bubble.appendChild(typing);
   content.appendChild(bubble);
   msgDiv.appendChild(content);
   msgContainer.appendChild(msgDiv);
   scrollToBottom();
-  return { bubble, id, content };
+  return { bubble: bubble, id: id, content: content };
 }
 
-function scrollToBottom() { requestAnimationFrame(() => { msgContainer.scrollTop = msgContainer.scrollHeight; }); }
-function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000); }
+function scrollToBottom() { requestAnimationFrame(function() { msgContainer.scrollTop = msgContainer.scrollHeight; }); }
+function showToast(msg) { var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(function() { t.classList.remove('show'); }, 4000); }
 
-// ── Edit message ──
-let editingMsgId = null;
-document.getElementById('editCancel').onclick = () => { document.getElementById('editOverlay').classList.remove('show'); };
-document.getElementById('editConfirm').onclick = () => {
-  const newText = document.getElementById('editText').value.trim();
+// Edit message
+var editingMsgId = null;
+document.getElementById('editCancel').onclick = function() { document.getElementById('editOverlay').classList.remove('show'); };
+document.getElementById('editConfirm').onclick = function() {
+  var newText = document.getElementById('editText').value.trim();
   if (!newText || !editingMsgId) return;
   document.getElementById('editOverlay').classList.remove('show');
-
-  // Remove all messages after the edited one
-  const idx = chatHistory.findIndex(m => m.id === editingMsgId);
+  var idx = chatHistory.findIndex(function(m) { return m.id === editingMsgId; });
   if (idx >= 0) {
     chatHistory = chatHistory.slice(0, idx);
     saveHistory();
-    // Re-render
     reRenderChat();
   }
-  // Send as new message
   inputField.value = newText;
   sendMessage();
 };
@@ -421,207 +403,226 @@ function openEditPanel(id, text) {
   document.getElementById('editOverlay').classList.add('show');
 }
 
-// ── Regenerate ──
+// Regenerate
 function regenerateMessage(aiMsgId) {
   if (isStreaming) return;
-  const idx = chatHistory.findIndex(m => m.id === aiMsgId);
+  var idx = chatHistory.findIndex(function(m) { return m.id === aiMsgId; });
   if (idx < 0) return;
-
-  // Find the user message before this AI message
-  let userMsg = null;
-  for (let i = idx - 1; i >= 0; i--) {
+  var userMsg = null;
+  for (var i = idx - 1; i >= 0; i--) {
     if (chatHistory[i].role === 'user') { userMsg = chatHistory[i]; break; }
   }
   if (!userMsg) return;
-
-  // Remove the AI message
   chatHistory = chatHistory.slice(0, idx);
   saveHistory();
   reRenderChat();
-
-  // Re-send
   sendMessageWithText(userMsg.text, false);
 }
 
 function reRenderChat() {
   msgContainer.innerHTML = '';
   if (chatHistory.length === 0) {
-    const w = document.createElement('div'); w.className = 'welcome'; w.id = 'welcome';
-    const avatarData = localStorage.getItem(KEYS.avatar);
+    var w = document.createElement('div'); w.className = 'welcome'; w.id = 'welcome';
+    var avatarData = localStorage.getItem(KEYS.avatar);
     if (avatarData) {
-      const av = document.createElement('img'); av.className = 'welcome-avatar'; av.src = avatarData;
+      var av = document.createElement('img'); av.className = 'welcome-avatar'; av.src = avatarData;
       w.appendChild(av);
     }
-    const txt = document.createElement('div'); txt.className = 'welcome-text'; txt.innerHTML = '我在这里<br>随时可以开始';
+    var txt = document.createElement('div'); txt.className = 'welcome-text'; txt.innerHTML = '我在这里<br>随时可以开始';
     w.appendChild(txt);
     msgContainer.appendChild(w);
     return;
   }
   lastMessageTime = null;
-  chatHistory.forEach(msg => {
-    addTimeDivider(new Date(msg.time));
-    renderMessage(msg.role, msg.text, msg.id, false);
-  });
+  for (var i = 0; i < chatHistory.length; i++) {
+    addTimeDivider(new Date(chatHistory[i].time));
+    renderMessage(chatHistory[i].role, chatHistory[i].text, chatHistory[i].id, false);
+  }
   scrollToBottom();
 }
 
-// ── TTS Voice ──
+// TTS Voice
 function stripParentheses(text) {
-  // Remove content in Chinese/English parentheses (stage directions)
-  return text.replace(/[（(][^）)]*[）)]/g, '').trim();
+  return text.replace(/[\uff08\u0028][^\uff09\u0029]*[\uff09\u0029]/g, '').replace(/\*[^*]*\*/g, '').trim();
 }
 
-async function playVoice(text, btn) {
+function playVoice(text, btn) {
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-
-  const cleanText = stripParentheses(text);
+  var cleanText = stripParentheses(text);
   if (!cleanText) { showToast('没有可播放的文本'); return; }
 
-  btn.classList.add('audio-playing');
-  btn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>播放中';
+  if (btn) {
+    btn.classList.add('audio-playing');
+    btn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>播放中';
+  }
 
-  try {
-    const res = await fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: cleanText,
-        appid: config.ttsAppId,
-        token: config.ttsToken,
-        voice_type: config.ttsSpeaker,
-        cluster: 'volcano_icl'
-      })
-    });
-
-    if (!res.ok) throw new Error('TTS failed');
-    const result = await res.json();
-
+  fetch('/api/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text: cleanText,
+      appid: config.ttsAppId,
+      token: config.ttsToken,
+      voice_type: config.ttsSpeaker,
+      cluster: 'volcano_icl'
+    })
+  })
+  .then(function(res) {
+    if (!res.ok) return res.text().then(function(t) { throw new Error('HTTP ' + res.status + ': ' + t); });
+    return res.json();
+  })
+  .then(function(result) {
     if (result.code === 3000 && result.data) {
-      const audioBytes = Uint8Array.from(atob(result.data), c => c.charCodeAt(0));
-      const blob = new Blob([audioBytes], { type: 'audio/mp3' });
-      const url = URL.createObjectURL(blob);
+      var raw = atob(result.data);
+      var arr = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+      var blob = new Blob([arr], { type: 'audio/mp3' });
+      var url = URL.createObjectURL(blob);
       currentAudio = new Audio(url);
       currentAudio.play();
-      currentAudio.onended = () => {
-        btn.classList.remove('audio-playing');
-        btn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>播放';
+      currentAudio.onended = function() {
+        if (btn) {
+          btn.classList.remove('audio-playing');
+          btn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>播放';
+        }
         URL.revokeObjectURL(url);
         currentAudio = null;
       };
     } else {
-      throw new Error(result.message || 'TTS error');
+      throw new Error('TTS code: ' + result.code + ' msg: ' + (result.message || 'unknown'));
     }
-  } catch (err) {
+  })
+  .catch(function(err) {
     console.error('TTS error:', err);
-    btn.classList.remove('audio-playing');
-    btn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>播放';
-    showToast('语音: ' + err.message + ');
-  }
+    if (btn) {
+      btn.classList.remove('audio-playing');
+      btn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>播放';
+    }
+    showToast('语音: ' + err.message);
+  });
 }
 
-// ── Send message ──
-async function sendMessage() {
-  const text = inputField.value.trim();
+// Send message
+function sendMessage() {
+  var text = inputField.value.trim();
   if (!text || isStreaming) return;
   inputField.value = ''; inputField.style.height = 'auto'; btnSend.classList.remove('active');
   sendMessageWithText(text, true);
 }
 
-async function sendMessageWithText(text, addToHistory) {
+function sendMessageWithText(text, addToHist) {
   if (!config.botId || !config.token) { showToast('请先配置 Bot ID 和 Token'); toggleConfig(true); return; }
+  if (addToHist) addMessage('user', text);
 
-  if (addToHistory) addMessage('user', text);
-
-  const timeDiff = getTimeDiffText();
-  const now = new Date();
-  const timeStr = now.toLocaleString('zh-CN', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
-  let ctx = `[当前时间: ${timeStr}]`;
-  if (timeDiff) ctx += ` [距离上次对话已过去: ${timeDiff}]`;
-  const fullMessage = `${ctx}\n${text}`;
+  var timeDiff = getTimeDiffText();
+  var now = new Date();
+  var timeStr = now.toLocaleString('zh-CN', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+  var ctx = '[当前时间: ' + timeStr + ']';
+  if (timeDiff) ctx += ' [距离上次对话已过去: ' + timeDiff + ']';
+  var fullMessage = ctx + '\n' + text;
 
   isStreaming = true;
-  const { bubble, id, content } = addStreamingMessage();
+  var streamResult = addStreamingMessage();
+  var bubble = streamResult.bubble;
+  var msgId = streamResult.id;
+  var content = streamResult.content;
 
-  try {
-    const fullText = await streamChat(fullMessage, bubble);
-    // Save AI response to history
-    chatHistory.push({ role: 'ai', text: fullText, id, time: Date.now() });
+  streamChat(fullMessage, bubble)
+  .then(function(fullText) {
+    chatHistory.push({ role: 'ai', text: fullText, id: msgId, time: Date.now() });
     saveHistory();
 
-    // Add action buttons after streaming completes
-    const actions = document.createElement('div'); actions.className = 'msg-actions';
+    var actions = document.createElement('div'); actions.className = 'msg-actions';
     if (config.ttsAppId && config.ttsToken && config.ttsSpeaker) {
-      const playBtn = document.createElement('button'); playBtn.className = 'msg-action-btn';
+      var playBtn = document.createElement('button'); playBtn.className = 'msg-action-btn';
       playBtn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>播放';
-      playBtn.onclick = () => playVoice(fullText, playBtn);
+      playBtn.onclick = function() { playVoice(fullText, playBtn); };
       actions.appendChild(playBtn);
+
+      // Auto-play voice
+      setTimeout(function() { playVoice(fullText, playBtn); }, 300);
     }
-    const regenBtn = document.createElement('button'); regenBtn.className = 'msg-action-btn';
+    var regenBtn = document.createElement('button'); regenBtn.className = 'msg-action-btn';
     regenBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>重新生成';
-    regenBtn.onclick = () => regenerateMessage(id);
+    regenBtn.onclick = function() { regenerateMessage(msgId); };
     actions.appendChild(regenBtn);
     content.appendChild(actions);
 
-  } catch (err) {
+    isStreaming = false;
+    updateLastActive();
+  })
+  .catch(function(err) {
     console.error(err);
-    const t = document.getElementById('typing'); if (t) t.remove();
+    var t = document.getElementById('typing'); if (t) t.remove();
     bubble.textContent = '连接出了点问题，再试一次？';
     showToast(err.message || '请求失败');
-  }
-
-  isStreaming = false;
-  updateLastActive();
-}
-
-// ── Coze streaming ──
-async function streamChat(message, bubble) {
-  const body = {
-    bot_id: config.botId, user_id: USER_ID, stream: true, auto_save_history: true,
-    additional_messages: [{ role: 'user', content: message, content_type: 'text' }]
-  };
-  if (conversationId) body.conversation_id = conversationId;
-
-  const response = await fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${config.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    isStreaming = false;
+    updateLastActive();
   });
-  if (!response.ok) throw new Error(`API 错误: ${response.status}`);
-
-  const reader = response.body.getReader(), decoder = new TextDecoder();
-  let buffer = '', fullText = '', typingRemoved = false, currentEvent = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-
-    for (const line of lines) {
-      if (line.startsWith('event:')) { currentEvent = line.slice(6).trim(); continue; }
-      if (line.startsWith('data:')) {
-        const d = line.slice(5).trim();
-        if (d === '[DONE]') continue;
-        try {
-          const data = JSON.parse(d);
-          if (data.conversation_id) { conversationId = data.conversation_id; localStorage.setItem(KEYS.convId, conversationId); }
-          if (currentEvent === 'conversation.message.delta' && data.type === 'answer' && data.content) {
-            if (!typingRemoved) { const t = document.getElementById('typing'); if (t) t.remove(); typingRemoved = true; }
-            fullText += data.content;
-            bubble.textContent = fullText;
-            scrollToBottom();
-          }
-        } catch(e) {}
-      }
-    }
-  }
-  if (!typingRemoved) { const t = document.getElementById('typing'); if (t) t.remove(); if (!fullText) { fullText = '...'; bubble.textContent = fullText; } }
-  return fullText;
 }
 
-// ── Page lifecycle ──
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') updateLastActive(); });
+// Coze streaming
+function streamChat(message, bubble) {
+  return new Promise(function(resolve, reject) {
+    var body = {
+      bot_id: config.botId, user_id: USER_ID, stream: true, auto_save_history: true,
+      additional_messages: [{ role: 'user', content: message, content_type: 'text' }]
+    };
+    if (conversationId) body.conversation_id = conversationId;
+
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + config.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    .then(function(response) {
+      if (!response.ok) throw new Error('API 错误: ' + response.status);
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+      var fullText = '';
+      var typingRemoved = false;
+      var currentEvent = '';
+
+      function read() {
+        reader.read().then(function(result) {
+          if (result.done) {
+            if (!typingRemoved) { var t = document.getElementById('typing'); if (t) t.remove(); if (!fullText) { fullText = '...'; bubble.textContent = fullText; } }
+            resolve(fullText);
+            return;
+          }
+          buffer += decoder.decode(result.value, { stream: true });
+          var lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            if (line.indexOf('event:') === 0) { currentEvent = line.substring(6).trim(); continue; }
+            if (line.indexOf('data:') === 0) {
+              var d = line.substring(5).trim();
+              if (d === '[DONE]') continue;
+              try {
+                var data = JSON.parse(d);
+                if (data.conversation_id) { conversationId = data.conversation_id; localStorage.setItem(KEYS.convId, conversationId); }
+                if (currentEvent === 'conversation.message.delta' && data.type === 'answer' && data.content) {
+                  if (!typingRemoved) { var t = document.getElementById('typing'); if (t) t.remove(); typingRemoved = true; }
+                  fullText += data.content;
+                  bubble.textContent = fullText;
+                  scrollToBottom();
+                }
+              } catch(e) {}
+            }
+          }
+          read();
+        }).catch(reject);
+      }
+      read();
+    })
+    .catch(reject);
+  });
+}
+
+document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'hidden') updateLastActive(); });
 updateLastActive();
 initUI();
 </script>
