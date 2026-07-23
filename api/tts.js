@@ -1,13 +1,25 @@
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+export const config = {
+  runtime: 'edge'
+};
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+export default async function handler(req) {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      }
+    });
+  }
+
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+  }
 
   try {
-    const { text, appid, token, voice_type, cluster } = req.body;
+    const { text, appid, token, voice_type, cluster } = await req.json();
     const reqid = 'req_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
     const ttsBody = {
@@ -19,16 +31,29 @@ export default async function handler(req, res) {
 
     const ttsRes = await fetch('https://openspeech.bytedance.com/api/v1/tts', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer;${token}` },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer;${token}`
+      },
       body: JSON.stringify(ttsBody)
     });
 
-    if (!ttsRes.ok) { const errText = await ttsRes.text(); return res.status(ttsRes.status).send(errText); }
-    const result = await ttsRes.json();
-    res.setHeader('Content-Type', 'application/json');
-    res.status(200).json(result);
+    if (!ttsRes.ok) {
+      const errText = await ttsRes.text();
+      return new Response(errText, { status: ttsRes.status });
+    }
+
+    const result = await ttsRes.text();
+    return new Response(result, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
+    });
   } catch (err) {
-    console.error('TTS proxy error:', err);
-    res.status(500).json({ error: err.message });
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+    });
   }
 }
