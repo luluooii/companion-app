@@ -47,85 +47,14 @@ export default async function handler(req) {
       body: JSON.stringify(ttsBody)
     });
 
-    if (!ttsRes.ok) {
-      const errText = await ttsRes.text();
-      return new Response(JSON.stringify({ code: -1, message: 'HTTP ' + ttsRes.status + ': ' + errText }), {
-        status: ttsRes.status,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-      });
-    }
+    // DEBUG: capture raw response to see format
+    const rawText = await ttsRes.text();
+    const preview = rawText.substring(0, 2000);
 
-    // V3 returns streaming chunks with base64 audio data
-    // Collect all chunks, decode to binary, combine, then re-encode
-    const reader = ttsRes.body.getReader();
-    const decoder = new TextDecoder();
-    const audioArrays = [];
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      // Split by newlines to find complete JSON objects
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        try {
-          const chunk = JSON.parse(trimmed);
-          if (chunk.data) {
-            // Decode base64 chunk to binary
-            const binary = Uint8Array.from(atob(chunk.data), c => c.charCodeAt(0));
-            audioArrays.push(binary);
-          }
-        } catch (e) {
-          // Skip non-JSON lines
-        }
-      }
-    }
-
-    // Process remaining buffer
-    if (buffer.trim()) {
-      try {
-        const chunk = JSON.parse(buffer.trim());
-        if (chunk.data) {
-          const binary = Uint8Array.from(atob(chunk.data), c => c.charCodeAt(0));
-          audioArrays.push(binary);
-        }
-      } catch (e) {}
-    }
-
-    if (audioArrays.length === 0) {
-      return new Response(JSON.stringify({ code: -1, message: 'No audio data received' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-      });
-    }
-
-    // Combine all binary arrays
-    const totalLength = audioArrays.reduce((sum, arr) => sum + arr.length, 0);
-    const combined = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const arr of audioArrays) {
-      combined.set(arr, offset);
-      offset += arr.length;
-    }
-
-    // Re-encode to base64
-    let base64 = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < combined.length; i += chunkSize) {
-      const slice = combined.subarray(i, Math.min(i + chunkSize, combined.length));
-      base64 += String.fromCharCode.apply(null, slice);
-    }
-    base64 = btoa(base64);
-
-    // Return in the format the frontend expects: { code: 3000, data: "base64..." }
-    return new Response(JSON.stringify({ code: 3000, data: base64 }), {
+    return new Response(JSON.stringify({
+      code: -1,
+      message: 'DEBUG - status: ' + ttsRes.status + ' | content-type: ' + (ttsRes.headers.get('content-type') || 'none') + ' | body: ' + preview
+    }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
