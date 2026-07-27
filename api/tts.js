@@ -2,29 +2,6 @@ export const config = {
   runtime: 'edge'
 };
 
-async function tryV1(appid, token, voice_type, text, cluster) {
-  const reqid = 'req_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  const ttsBody = {
-    app: { appid: appid, token: token, cluster: cluster },
-    user: { uid: 'companion_user' },
-    audio: { voice_type: voice_type, encoding: 'mp3', speed_ratio: 1.0, volume_ratio: 1.0, pitch_ratio: 1.0 },
-    request: { reqid: reqid, text: text, text_type: 'plain', operation: 'query' }
-  };
-
-  const res = await fetch('https://openspeech.bytedance.com/api/v1/tts', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer;' + token
-    },
-    body: JSON.stringify(ttsBody)
-  });
-
-  const body = await res.text();
-  const preview = body.substring(0, 200);
-  return cluster + ' => status:' + res.status + ' body:' + preview;
-}
-
 export default async function handler(req) {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -46,23 +23,80 @@ export default async function handler(req) {
 
   try {
     const { appid, token, voice_type } = await req.json();
-    const testText = '你好，我是易遇，今天天气真好。';
-
-    const clusters = ['volcano_icl', 'volcano_mega', 'volcano_tts'];
     const results = [];
 
-    for (const c of clusters) {
-      try {
-        const r = await tryV1(appid, token, voice_type, testText, c);
-        results.push(r);
-      } catch (e) {
-        results.push(c + ' => ERROR: ' + e.message);
-      }
+    // Step 1: Check voice status via mega_tts status API
+    try {
+      const statusRes = await fetch('https://openspeech.bytedance.com/api/v1/mega_tts/status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer;' + token,
+          'Resource-Id': 'volc.megatts.voiceclone'
+        },
+        body: JSON.stringify({ appid: appid, speaker_id: voice_type })
+      });
+      const statusBody = await statusRes.text();
+      results.push('STATUS: ' + statusBody.substring(0, 500));
+    } catch (e) {
+      results.push('STATUS ERROR: ' + e.message);
+    }
+
+    // Step 2: Try V3 with seed-icl-2.0 + additions model_type=1
+    try {
+      const res1 = await fetch('https://openspeech.bytedance.com/api/v3/tts/unidirectional', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-App-Id': appid,
+          'X-Api-Access-Key': token,
+          'X-Api-Resource-Id': 'seed-icl-1.0'
+        },
+        body: JSON.stringify({
+          user: { uid: 'companion_user' },
+          req_params: {
+            text: '你好，我是易遇。',
+            speaker: voice_type,
+            audio_params: { format: 'mp3', sample_rate: 24000 },
+            additions: JSON.stringify({ model_type: 1 })
+          }
+        })
+      });
+      const body1 = await res1.text();
+      results.push('icl1.0+mt1: ' + body1.substring(0, 200));
+    } catch (e) {
+      results.push('icl1.0+mt1 ERROR: ' + e.message);
+    }
+
+    // Step 3: Try V3 with seed-icl-2.0 + additions model_type=4
+    try {
+      const res2 = await fetch('https://openspeech.bytedance.com/api/v3/tts/unidirectional', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-App-Id': appid,
+          'X-Api-Access-Key': token,
+          'X-Api-Resource-Id': 'seed-icl-2.0'
+        },
+        body: JSON.stringify({
+          user: { uid: 'companion_user' },
+          req_params: {
+            text: '你好，我是易遇。',
+            speaker: voice_type,
+            audio_params: { format: 'mp3', sample_rate: 24000 },
+            additions: JSON.stringify({ model_type: 4 })
+          }
+        })
+      });
+      const body2 = await res2.text();
+      results.push('icl2.0+mt4: ' + body2.substring(0, 200));
+    } catch (e) {
+      results.push('icl2.0+mt4 ERROR: ' + e.message);
     }
 
     return new Response(JSON.stringify({
       code: -1,
-      message: 'V1-TEST | ' + results.join(' ||| ')
+      message: results.join(' ||| ')
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
