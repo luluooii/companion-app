@@ -22,12 +22,16 @@ export default async function handler(req) {
   }
 
   try {
-    const { text, appid, token, voice_type } = await req.json();
+    const body = await req.json();
+    const { text, appid, token, voice_type } = body;
+
+    // Use hardcoded test text to isolate the problem
+    const testText = '你好，我是易遇。';
 
     const ttsBody = {
       user: { uid: 'companion_user' },
       req_params: {
-        text: text,
+        text: testText,
         speaker: voice_type,
         audio_params: {
           format: 'mp3',
@@ -47,20 +51,19 @@ export default async function handler(req) {
       body: JSON.stringify(ttsBody)
     });
 
-    // DEBUG: capture raw response to see format
     const rawText = await ttsRes.text();
-    const preview = rawText.substring(0, 2000);
+    const preview = rawText.substring(0, 1500);
 
     return new Response(JSON.stringify({
       code: -1,
-      message: 'DEBUG - status: ' + ttsRes.status + ' | content-type: ' + (ttsRes.headers.get('content-type') || 'none') + ' | body: ' + preview
+      message: 'DEBUG2 | received_text: [' + (text || 'EMPTY') + '] | voice_type: [' + (voice_type || 'EMPTY') + '] | appid: [' + (appid || 'EMPTY') + '] | api_status: ' + ttsRes.status + ' | api_body: ' + preview
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
 
   } catch (err) {
-    return new Response(JSON.stringify({ code: -1, message: err.message }), {
+    return new Response(JSON.stringify({ code: -1, message: 'ERROR: ' + err.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
