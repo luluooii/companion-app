@@ -2,32 +2,27 @@ export const config = {
   runtime: 'edge'
 };
 
-async function tryTTS(appid, token, voice_type, text, resourceId) {
+async function tryV1(appid, token, voice_type, text, cluster) {
+  const reqid = 'req_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   const ttsBody = {
+    app: { appid: appid, token: token, cluster: cluster },
     user: { uid: 'companion_user' },
-    req_params: {
-      text: text,
-      speaker: voice_type,
-      audio_params: {
-        format: 'mp3',
-        sample_rate: 24000
-      }
-    }
+    audio: { voice_type: voice_type, encoding: 'mp3', speed_ratio: 1.0, volume_ratio: 1.0, pitch_ratio: 1.0 },
+    request: { reqid: reqid, text: text, text_type: 'plain', operation: 'query' }
   };
 
-  const res = await fetch('https://openspeech.bytedance.com/api/v3/tts/unidirectional', {
+  const res = await fetch('https://openspeech.bytedance.com/api/v1/tts', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Api-App-Id': appid,
-      'X-Api-Access-Key': token,
-      'X-Api-Resource-Id': resourceId
+      'Authorization': 'Bearer;' + token
     },
     body: JSON.stringify(ttsBody)
   });
 
   const body = await res.text();
-  return resourceId + ' => status:' + res.status + ' body:' + body.substring(0, 300);
+  const preview = body.substring(0, 200);
+  return cluster + ' => status:' + res.status + ' body:' + preview;
 }
 
 export default async function handler(req) {
@@ -53,21 +48,21 @@ export default async function handler(req) {
     const { appid, token, voice_type } = await req.json();
     const testText = '你好，我是易遇，今天天气真好。';
 
+    const clusters = ['volcano_icl', 'volcano_mega', 'volcano_tts'];
     const results = [];
-    const ids = ['seed-icl-1.0', 'seed-icl-2.0', 'seed-tts-2.0', 'volc.megatts.voiceclone'];
 
-    for (const rid of ids) {
+    for (const c of clusters) {
       try {
-        const r = await tryTTS(appid, token, voice_type, testText, rid);
+        const r = await tryV1(appid, token, voice_type, testText, c);
         results.push(r);
       } catch (e) {
-        results.push(rid + ' => ERROR: ' + e.message);
+        results.push(c + ' => ERROR: ' + e.message);
       }
     }
 
     return new Response(JSON.stringify({
       code: -1,
-      message: 'MULTI-TEST | ' + results.join(' ||| ')
+      message: 'V1-TEST | ' + results.join(' ||| ')
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
