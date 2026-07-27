@@ -22,76 +22,73 @@ export default async function handler(req) {
   }
 
   try {
-    const { appid, token, voice_type } = await req.json();
+    const { voice_type } = await req.json();
+    const apiKey = '3dfd9390-7033-4f68-ba7f-d734e696c9cb';
+    const testText = '你好，我是易遇，今天天气真好。';
     const results = [];
 
-    // Step 1: Check voice status via mega_tts status API
+    // Test 1: New auth style - Authorization: Bearer {apiKey} with seed-icl-2.0
     try {
-      const statusRes = await fetch('https://openspeech.bytedance.com/api/v1/mega_tts/status', {
+      const res = await fetch('https://openspeech.bytedance.com/api/v3/tts/unidirectional', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer;' + token,
-          'Resource-Id': 'volc.megatts.voiceclone'
-        },
-        body: JSON.stringify({ appid: appid, speaker_id: voice_type })
-      });
-      const statusBody = await statusRes.text();
-      results.push('STATUS: ' + statusBody.substring(0, 500));
-    } catch (e) {
-      results.push('STATUS ERROR: ' + e.message);
-    }
-
-    // Step 2: Try V3 with seed-icl-2.0 + additions model_type=1
-    try {
-      const res1 = await fetch('https://openspeech.bytedance.com/api/v3/tts/unidirectional', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-App-Id': appid,
-          'X-Api-Access-Key': token,
-          'X-Api-Resource-Id': 'seed-icl-1.0'
-        },
-        body: JSON.stringify({
-          user: { uid: 'companion_user' },
-          req_params: {
-            text: '你好，我是易遇。',
-            speaker: voice_type,
-            audio_params: { format: 'mp3', sample_rate: 24000 },
-            additions: JSON.stringify({ model_type: 1 })
-          }
-        })
-      });
-      const body1 = await res1.text();
-      results.push('icl1.0+mt1: ' + body1.substring(0, 200));
-    } catch (e) {
-      results.push('icl1.0+mt1 ERROR: ' + e.message);
-    }
-
-    // Step 3: Try V3 with seed-icl-2.0 + additions model_type=4
-    try {
-      const res2 = await fetch('https://openspeech.bytedance.com/api/v3/tts/unidirectional', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-App-Id': appid,
-          'X-Api-Access-Key': token,
+          'Authorization': 'Bearer ' + apiKey,
           'X-Api-Resource-Id': 'seed-icl-2.0'
         },
         body: JSON.stringify({
           user: { uid: 'companion_user' },
           req_params: {
-            text: '你好，我是易遇。',
-            speaker: voice_type,
-            audio_params: { format: 'mp3', sample_rate: 24000 },
-            additions: JSON.stringify({ model_type: 4 })
+            text: testText,
+            speaker: voice_type || 'S_dRt2Ozd82',
+            audio_params: { format: 'mp3', sample_rate: 24000 }
           }
         })
       });
-      const body2 = await res2.text();
-      results.push('icl2.0+mt4: ' + body2.substring(0, 200));
+      const body = await res.text();
+      results.push('Bearer+icl2.0: status=' + res.status + ' body=' + body.substring(0, 300));
     } catch (e) {
-      results.push('icl2.0+mt4 ERROR: ' + e.message);
+      results.push('Bearer+icl2.0 ERR: ' + e.message);
+    }
+
+    // Test 2: New auth with seed-icl-1.0
+    try {
+      const res = await fetch('https://openspeech.bytedance.com/api/v3/tts/unidirectional', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey,
+          'X-Api-Resource-Id': 'seed-icl-1.0'
+        },
+        body: JSON.stringify({
+          user: { uid: 'companion_user' },
+          req_params: {
+            text: testText,
+            speaker: voice_type || 'S_dRt2Ozd82',
+            audio_params: { format: 'mp3', sample_rate: 24000 }
+          }
+        })
+      });
+      const body = await res.text();
+      results.push('Bearer+icl1.0: status=' + res.status + ' body=' + body.substring(0, 300));
+    } catch (e) {
+      results.push('Bearer+icl1.0 ERR: ' + e.message);
+    }
+
+    // Test 3: mega_tts status with new auth
+    try {
+      const res = await fetch('https://openspeech.bytedance.com/api/v1/mega_tts/status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey
+        },
+        body: JSON.stringify({ speaker_id: voice_type || 'S_dRt2Ozd82' })
+      });
+      const body = await res.text();
+      results.push('STATUS: ' + body.substring(0, 300));
+    } catch (e) {
+      results.push('STATUS ERR: ' + e.message);
     }
 
     return new Response(JSON.stringify({
