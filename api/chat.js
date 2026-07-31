@@ -1,660 +1,171 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>易遇</title>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500&display=swap');
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{--bg:#0a0a0c;--surface:#141418;--border:#232329;--text-primary:#e8e6e3;--text-secondary:#8a8a8f;--text-dim:#555560;--accent:#7c9caa;--user-bubble:#1a2530;--radius:18px;--safe-bottom:env(safe-area-inset-bottom,0px)}
-html,body{height:100%;overflow:hidden;font-family:'Noto Sans SC',-apple-system,sans-serif;font-weight:300;background:var(--bg);color:var(--text-primary);-webkit-font-smoothing:antialiased}
-#app{display:flex;flex-direction:column;height:100dvh;position:relative}
-#bgImage{position:fixed;inset:0;background-size:cover;background-position:center;opacity:0.15;z-index:0;pointer-events:none}
-.header{flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:14px 20px;padding-top:calc(14px + env(safe-area-inset-top,0px));border-bottom:1px solid var(--border);background:rgba(10,10,12,0.85);backdrop-filter:blur(12px);position:relative;z-index:2}
-.header-left{position:absolute;left:16px;display:flex;align-items:center;gap:6px}
-.header-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--border)}
-.header-title{font-size:15px;font-weight:400;letter-spacing:.5px;color:var(--text-secondary)}
-.header-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:8px;animation:pulse 3s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
-.header-right{position:absolute;right:16px;display:flex;gap:12px}
-.header-btn{background:none;border:none;color:var(--text-dim);font-size:13px;cursor:pointer;padding:4px 6px;border-radius:8px}
-.header-btn:active{background:var(--surface);color:var(--text-secondary)}
-.messages{flex:1;overflow-y:auto;padding:16px 14px;-webkit-overflow-scrolling:touch;z-index:1}
-.messages::-webkit-scrollbar{display:none}
-.msg{display:flex;margin-bottom:14px;animation:msgIn .3s ease-out;align-items:flex-start;gap:8px}
-@keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.msg.user{justify-content:flex-end}
-.msg.ai{justify-content:flex-start}
-.msg-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;margin-top:2px}
-.msg-content{display:flex;flex-direction:column;max-width:78%}
-.msg-bubble{padding:10px 14px;border-radius:var(--radius);font-size:14.5px;line-height:1.7;word-break:break-word;white-space:pre-wrap}
-.msg.user .msg-bubble{background:var(--user-bubble);border-bottom-right-radius:6px}
-.msg.ai .msg-bubble{background:rgba(255,255,255,0.04);border-bottom-left-radius:6px}
-.msg-actions{display:flex;gap:8px;margin-top:4px;padding:0 4px}
-.msg-action-btn{background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;padding:2px 6px;border-radius:6px;display:flex;align-items:center;gap:3px}
-.msg-action-btn:active{background:var(--surface);color:var(--text-secondary)}
-.msg-action-btn svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
-.typing-indicator{display:inline-flex;align-items:center;gap:4px;padding:10px 14px}
-.typing-indicator span{width:4px;height:4px;border-radius:50%;background:var(--text-dim);animation:blink 1.4s infinite}
-.typing-indicator span:nth-child(2){animation-delay:.2s}
-.typing-indicator span:nth-child(3){animation-delay:.4s}
-@keyframes blink{0%,60%,100%{opacity:.2}30%{opacity:1}}
-.time-divider{text-align:center;padding:10px 0;font-size:11px;color:var(--text-dim)}
-.input-area{flex-shrink:0;padding:10px 14px;padding-bottom:calc(10px + var(--safe-bottom));border-top:1px solid var(--border);background:rgba(10,10,12,0.9);backdrop-filter:blur(12px);display:flex;align-items:flex-end;gap:8px;z-index:2}
-.input-wrap{flex:1;display:flex;align-items:flex-end;background:var(--surface);border-radius:22px;border:1px solid var(--border);padding:6px 14px;transition:border-color .2s}
-.input-wrap:focus-within{border-color:var(--accent)}
-.input-wrap textarea{flex:1;background:transparent;border:none;outline:none;color:var(--text-primary);font-family:inherit;font-size:14.5px;font-weight:300;line-height:1.5;resize:none;max-height:100px;padding:5px 0}
-.input-wrap textarea::placeholder{color:var(--text-dim)}
-.send-btn{flex-shrink:0;width:38px;height:38px;border-radius:50%;border:none;background:var(--accent);color:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:.4;pointer-events:none;transition:all .2s}
-.send-btn.active{opacity:1;pointer-events:auto}
-.send-btn:active{transform:scale(.92)}
-.send-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-dim);text-align:center;padding:40px;gap:10px}
-.welcome-avatar{width:60px;height:60px;border-radius:50%;object-fit:cover;margin-bottom:8px;border:2px solid var(--border)}
-.welcome-text{font-size:13px;line-height:1.8;max-width:240px}
-.toast{position:fixed;top:calc(20px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%) translateY(-100px);background:#2a1a1a;color:#e88;padding:10px 20px;border-radius:12px;font-size:13px;border:1px solid #3a2020;transition:transform .3s;z-index:100;max-width:90%;text-align:center}
-.toast.show{transform:translateX(-50%) translateY(0)}
-.config-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;backdrop-filter:blur(4px)}
-.config-overlay.show{display:flex;align-items:flex-end}
-.config-panel{width:100%;max-height:85vh;overflow-y:auto;background:var(--surface);border-radius:20px 20px 0 0;padding:24px 20px;padding-bottom:calc(24px + var(--safe-bottom));animation:slideUp .3s ease}
-@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-.config-panel h3{font-size:15px;font-weight:400;margin-bottom:16px}
-.config-section{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border)}
-.config-section:last-child{border-bottom:none}
-.config-section-title{font-size:12px;color:var(--accent);margin-bottom:10px;letter-spacing:.5px}
-.config-field{margin-bottom:12px}
-.config-field label{display:block;font-size:12px;color:var(--text-secondary);margin-bottom:5px}
-.config-field input{width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-family:'SF Mono','Fira Code',monospace;font-size:12px;outline:none}
-.config-field input:focus{border-color:var(--accent)}
-.config-field input[type="file"]{font-family:inherit;font-size:12px;padding:8px}
-.config-save{width:100%;padding:11px;background:var(--accent);border:none;border-radius:12px;color:var(--bg);font-size:14px;font-weight:400;cursor:pointer;margin-top:6px}
-.config-save:active{opacity:.8}
-.edit-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;backdrop-filter:blur(4px);align-items:center;justify-content:center}
-.edit-overlay.show{display:flex}
-.edit-panel{width:90%;max-width:360px;background:var(--surface);border-radius:16px;padding:20px}
-.edit-panel textarea{width:100%;min-height:80px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-family:inherit;font-size:14px;padding:10px;outline:none;resize:vertical;margin:10px 0}
-.edit-panel textarea:focus{border-color:var(--accent)}
-.edit-btns{display:flex;gap:10px}
-.edit-btns button{flex:1;padding:10px;border:none;border-radius:10px;font-size:14px;cursor:pointer}
-.edit-cancel{background:var(--bg);color:var(--text-secondary)}
-.edit-confirm{background:var(--accent);color:var(--bg)}
-.audio-playing{color:var(--accent) !important}
-</style>
-</head>
-<body>
-<div id="app">
-<div id="bgImage"></div>
-<div class="header">
-  <div class="header-left">
-    <img class="header-avatar" id="headerAvatar" src="" style="display:none">
-  </div>
-  <div class="header-dot"></div>
-  <span class="header-title" id="headerTitle">易遇</span>
-  <div class="header-right">
-    <button class="header-btn" id="btnConfig">设置</button>
-  </div>
-</div>
-<div class="messages" id="msgContainer">
-  <div class="welcome" id="welcome">
-    <img class="welcome-avatar" id="welcomeAvatar" src="" style="display:none">
-    <div class="welcome-text">我在这里<br>随时可以开始</div>
-  </div>
-</div>
-<div class="input-area">
-  <div class="input-wrap">
-    <textarea id="inputField" rows="1" placeholder="说点什么..."></textarea>
-  </div>
-  <button class="send-btn" id="btnSend">
-    <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
-  </button>
-</div>
-</div>
-<div class="toast" id="toast"></div>
-<div class="config-overlay" id="configOverlay">
-<div class="config-panel">
-  <h3>设置</h3>
-  <div class="config-section">
-    <div class="config-section-title">对话</div>
-    <div class="config-field"><label>Bot ID</label><input type="text" id="cfgBotId"></div>
-    <div class="config-field"><label>API Token (PAT)</label><input type="password" id="cfgToken"></div>
-    <div class="config-field"><label>显示名称</label><input type="text" id="cfgName" placeholder="易遇"></div>
-  </div>
-  <div class="config-section">
-    <div class="config-section-title">语音</div>
-    <div class="config-field"><label>APP ID</label><input type="text" id="cfgTtsAppId"></div>
-    <div class="config-field"><label>Access Token</label><input type="password" id="cfgTtsToken"></div>
-    <div class="config-field"><label>音色 ID (speaker_id)</label><input type="text" id="cfgTtsSpeaker"></div>
-  </div>
-  <div class="config-section">
-    <div class="config-section-title">外观</div>
-    <div class="config-field"><label>头像图片</label><input type="file" id="cfgAvatar" accept="image/*"></div>
-    <div class="config-field"><label>背景图片</label><input type="file" id="cfgBg" accept="image/*"></div>
-  </div>
-  <button class="config-save" id="btnSaveConfig">保存</button>
-</div>
-</div>
-<div class="edit-overlay" id="editOverlay">
-<div class="edit-panel">
-  <div style="font-size:14px;color:var(--text-secondary)">编辑消息</div>
-  <textarea id="editText"></textarea>
-  <div class="edit-btns">
-    <button class="edit-cancel" id="editCancel">取消</button>
-    <button class="edit-confirm" id="editConfirm">发送</button>
-  </div>
-</div>
-</div>
-<script>
-var KEYS = {
-  config: 'comp_config',
-  lastActive: 'comp_last_active',
-  convId: 'comp_conv_id',
-  uid: 'comp_uid',
-  history: 'comp_history',
-  avatar: 'comp_avatar',
-  bg: 'comp_bg'
+export const config = {
+  runtime: 'edge'
 };
 
-var config = loadConfig();
-var conversationId = localStorage.getItem(KEYS.convId) || '';
-var isStreaming = false;
-var chatHistory = loadHistory();
-var currentAudio = null;
-var audioUnlocked = false;
-// iOS 的播放许可是发给"某一个 audio 元素"的，不是发给整个页面。
-// 所以全站只用这一个元素，解锁它之后，自动播放才放得出来。
-var audioEl = new Audio();
-audioEl.preload = 'auto';
-var activeBtn = null;
-var lastBlobUrl = null;
-var uid = localStorage.getItem(KEYS.uid);
-if (!uid) { uid = 'u_' + Date.now(); localStorage.setItem(KEYS.uid, uid); }
-var USER_ID = uid;
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+};
 
-function loadConfig() {
-  try { var r = localStorage.getItem('comp_config'); if (r) return JSON.parse(r); } catch(e) {}
-  return { botId:'', token:'', name:'易遇', ttsAppId:'', ttsToken:'', ttsSpeaker:'' };
-}
-function saveConfigToStorage(c) { config = c; localStorage.setItem('comp_config', JSON.stringify(c)); }
-function loadHistory() { try { var r = localStorage.getItem('comp_history'); if (r) return JSON.parse(r); } catch(e) {} return []; }
-function saveHistory() {
-  if (chatHistory.length > 100) chatHistory = chatHistory.slice(-100);
-  localStorage.setItem('comp_history', JSON.stringify(chatHistory));
-}
-
-var msgContainer = document.getElementById('msgContainer');
-var inputField = document.getElementById('inputField');
-var btnSend = document.getElementById('btnSend');
-var lastMessageTime = null;
-
-function initUI() {
-  document.getElementById('headerTitle').textContent = config.name || '易遇';
-  var avatarData = localStorage.getItem(KEYS.avatar);
-  if (avatarData) {
-    document.getElementById('headerAvatar').src = avatarData;
-    document.getElementById('headerAvatar').style.display = 'block';
-    document.getElementById('welcomeAvatar').src = avatarData;
-    document.getElementById('welcomeAvatar').style.display = 'block';
+export default async function handler(req) {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
-  var bgData = localStorage.getItem(KEYS.bg);
-  if (bgData) {
-    document.getElementById('bgImage').style.backgroundImage = 'url(' + bgData + ')';
-  }
-  document.getElementById('cfgBotId').value = config.botId || '';
-  document.getElementById('cfgToken').value = config.token || '';
-  document.getElementById('cfgName').value = config.name || '';
-  document.getElementById('cfgTtsAppId').value = config.ttsAppId || '';
-  document.getElementById('cfgTtsToken').value = config.ttsToken || '';
-  document.getElementById('cfgTtsSpeaker').value = config.ttsSpeaker || '';
-  if (!config.botId || !config.token) setTimeout(function() { toggleConfig(true); }, 500);
-  if (chatHistory.length > 0) {
-    document.getElementById('welcome').style.display = 'none';
-    for (var i = 0; i < chatHistory.length; i++) {
-      addTimeDivider(new Date(chatHistory[i].time));
-      renderMessage(chatHistory[i].role, chatHistory[i].text, chatHistory[i].id, false);
-    }
-    scrollToBottom();
-  }
-}
 
-document.getElementById('btnConfig').addEventListener('click', function() { toggleConfig(true); });
-document.getElementById('configOverlay').addEventListener('click', function(e) { if (e.target === e.currentTarget) toggleConfig(false); });
-document.getElementById('btnSaveConfig').addEventListener('click', function() {
-  var botId = document.getElementById('cfgBotId').value.trim();
-  var token = document.getElementById('cfgToken').value.trim();
-  var name = document.getElementById('cfgName').value.trim();
-  var ttsAppId = document.getElementById('cfgTtsAppId').value.trim();
-  var ttsToken = document.getElementById('cfgTtsToken').value.trim();
-  var ttsSpeaker = document.getElementById('cfgTtsSpeaker').value.trim();
-  if (!botId || !token) { showToast('请填写 Bot ID 和 Token'); return; }
-  saveConfigToStorage({ botId: botId, token: token, name: name || '易遇', ttsAppId: ttsAppId, ttsToken: ttsToken, ttsSpeaker: ttsSpeaker });
-  document.getElementById('headerTitle').textContent = name || '易遇';
-  var avatarFile = document.getElementById('cfgAvatar').files[0];
-  if (avatarFile) {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      localStorage.setItem(KEYS.avatar, e.target.result);
-      document.getElementById('headerAvatar').src = e.target.result;
-      document.getElementById('headerAvatar').style.display = 'block';
-      document.getElementById('welcomeAvatar').src = e.target.result;
-      document.getElementById('welcomeAvatar').style.display = 'block';
-    };
-    reader.readAsDataURL(avatarFile);
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
-  var bgFile = document.getElementById('cfgBg').files[0];
-  if (bgFile) {
-    var reader2 = new FileReader();
-    reader2.onload = function(e) {
-      localStorage.setItem(KEYS.bg, e.target.result);
-      document.getElementById('bgImage').style.backgroundImage = 'url(' + e.target.result + ')';
-    };
-    reader2.readAsDataURL(bgFile);
-  }
-  toggleConfig(false);
-});
 
-function toggleConfig(s) { document.getElementById('configOverlay').classList.toggle('show', s); }
-
-inputField.addEventListener('input', function() {
-  inputField.style.height = 'auto';
-  inputField.style.height = Math.min(inputField.scrollHeight, 100) + 'px';
-  btnSend.classList.toggle('active', inputField.value.trim().length > 0);
-});
-inputField.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendMessage(); }
-});
-btnSend.addEventListener('click', sendMessage);
-
-// Unlock audio on first user interaction.
-// 关键：解锁的必须是 audioEl 本身，而不是另建一个临时元素。
-var SILENCE = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dX/////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+M4xAANaAKsAAAAACIAA/8AAAAAT//M4xBAAAA0gAAAAAPE';
-function unlockAudio() {
-  if (audioUnlocked) return;
-  audioUnlocked = true;
   try {
-    audioEl.src = SILENCE;
-    var p = audioEl.play();
-    if (p && typeof p.catch === 'function') {
-      p.catch(function() { audioUnlocked = false; });
+    const body = await req.json();
+    const {
+      bot_id,
+      user_id,
+      auto_save_history,
+      additional_messages,
+      conversation_id
+    } = body;
+
+    const token = req.headers.get('authorization');
+
+    // 只记录形状，不记录密钥本身
+    console.log('[chat] 入参检查', JSON.stringify({
+      has_token: Boolean(token),
+      token_len: token ? token.length : 0,
+      bot_id: bot_id || null,
+      user_id: user_id || null,
+      conversation_id: conversation_id || null,
+      messages_count: Array.isArray(additional_messages)
+        ? additional_messages.length
+        : null
+    }));
+
+    if (!token) {
+      console.log('[chat] 前端没带 Authorization 头');
+      return new Response(
+        JSON.stringify({ error: '前端没有传 Coze 密钥（Authorization 头是空的）' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
-  } catch (e) { audioUnlocked = false; }
-}
-document.addEventListener('click', unlockAudio);
-document.addEventListener('touchend', unlockAudio);
 
-function formatTime(d) { return d.toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit', hour12:false }); }
-function formatTimeDiff(ms) {
-  var m = Math.floor(ms/60000), h = Math.floor(m/60), d = Math.floor(h/24);
-  if (d > 0) return d + '天' + (h%24) + '小时';
-  if (h > 0) return h + '小时' + (m%60) + '分钟';
-  if (m > 0) return m + '分钟';
-  return '刚刚';
-}
-function getTimeDiffText() {
-  var l = localStorage.getItem(KEYS.lastActive); if (!l) return null;
-  var d = Date.now() - parseInt(l); if (d < 60000) return null; return formatTimeDiff(d);
-}
-function updateLastActive() { localStorage.setItem(KEYS.lastActive, Date.now().toString()); }
+    let url = 'https://api.coze.cn/v3/chat';
+    if (conversation_id) url += `?conversation_id=${conversation_id}`;
 
-function addTimeDivider(date) {
-  var now = new Date(), isToday = date.toDateString() === now.toDateString();
-  var text = isToday ? formatTime(date) : (date.getMonth()+1) + '/' + date.getDate() + ' ' + formatTime(date);
-  if (lastMessageTime && (date - lastMessageTime) < 300000) return;
-  var div = document.createElement('div'); div.className = 'time-divider'; div.textContent = text;
-  msgContainer.appendChild(div); lastMessageTime = date;
-}
-
-function genId() { return 'm_' + Date.now() + '_' + Math.random().toString(36).substr(2,6); }
-function hideWelcome() { var w = document.getElementById('welcome'); if (w) w.style.display = 'none'; }
-
-function renderMessage(role, text, id, animate) {
-  var msgDiv = document.createElement('div');
-  msgDiv.className = 'msg ' + role;
-  msgDiv.setAttribute('data-id', id);
-  if (!animate) msgDiv.style.animation = 'none';
-
-  if (role === 'ai') {
-    var avatarData = localStorage.getItem(KEYS.avatar);
-    if (avatarData) {
-      var av = document.createElement('img'); av.className = 'msg-avatar'; av.src = avatarData;
-      msgDiv.appendChild(av);
-    }
-  }
-
-  var content = document.createElement('div'); content.className = 'msg-content';
-  var bubble = document.createElement('div'); bubble.className = 'msg-bubble'; bubble.textContent = text;
-  content.appendChild(bubble);
-
-  var actions = document.createElement('div'); actions.className = 'msg-actions';
-
-  if (role === 'ai') {
-    if (config.ttsAppId && config.ttsToken && config.ttsSpeaker) {
-      var playBtn = document.createElement('button'); playBtn.className = 'msg-action-btn';
-      playBtn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>播放';
-      playBtn.onclick = function() { playVoice(text, playBtn); };
-      actions.appendChild(playBtn);
-    }
-    var regenBtn = document.createElement('button'); regenBtn.className = 'msg-action-btn';
-    regenBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>重新生成';
-    regenBtn.onclick = function() { regenerateMessage(id); };
-    actions.appendChild(regenBtn);
-  }
-
-  if (role === 'user') {
-    var editBtn = document.createElement('button'); editBtn.className = 'msg-action-btn';
-    editBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>编辑';
-    editBtn.onclick = function() { openEditPanel(id, text); };
-    actions.appendChild(editBtn);
-  }
-
-  content.appendChild(actions);
-  msgDiv.appendChild(content);
-  msgContainer.appendChild(msgDiv);
-  return bubble;
-}
-
-function addMessage(role, text) {
-  hideWelcome();
-  var now = new Date();
-  addTimeDivider(now);
-  var id = genId();
-  var bubble = renderMessage(role, text, id, true);
-  chatHistory.push({ role: role, text: text, id: id, time: now.getTime() });
-  saveHistory();
-  scrollToBottom();
-  return { bubble: bubble, id: id };
-}
-
-function addStreamingMessage() {
-  hideWelcome();
-  addTimeDivider(new Date());
-  var id = genId();
-  var msgDiv = document.createElement('div'); msgDiv.className = 'msg ai'; msgDiv.setAttribute('data-id', id);
-
-  var avatarData = localStorage.getItem(KEYS.avatar);
-  if (avatarData) {
-    var av = document.createElement('img'); av.className = 'msg-avatar'; av.src = avatarData;
-    msgDiv.appendChild(av);
-  }
-
-  var content = document.createElement('div'); content.className = 'msg-content';
-  var bubble = document.createElement('div'); bubble.className = 'msg-bubble';
-  var typing = document.createElement('div'); typing.className = 'typing-indicator'; typing.id = 'typing';
-  typing.innerHTML = '<span></span><span></span><span></span>';
-  bubble.appendChild(typing);
-  content.appendChild(bubble);
-  msgDiv.appendChild(content);
-  msgContainer.appendChild(msgDiv);
-  scrollToBottom();
-  return { bubble: bubble, id: id, content: content };
-}
-
-function scrollToBottom() { requestAnimationFrame(function() { msgContainer.scrollTop = msgContainer.scrollHeight; }); }
-function showToast(msg) { var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(function() { t.classList.remove('show'); }, 4000); }
-
-// Edit message
-var editingMsgId = null;
-document.getElementById('editCancel').onclick = function() { document.getElementById('editOverlay').classList.remove('show'); };
-document.getElementById('editConfirm').onclick = function() {
-  var newText = document.getElementById('editText').value.trim();
-  if (!newText || !editingMsgId) return;
-  document.getElementById('editOverlay').classList.remove('show');
-  var idx = chatHistory.findIndex(function(m) { return m.id === editingMsgId; });
-  if (idx >= 0) {
-    chatHistory = chatHistory.slice(0, idx);
-    saveHistory();
-    reRenderChat();
-  }
-  inputField.value = newText;
-  sendMessage();
-};
-
-function openEditPanel(id, text) {
-  editingMsgId = id;
-  document.getElementById('editText').value = text;
-  document.getElementById('editOverlay').classList.add('show');
-}
-
-// Regenerate
-function regenerateMessage(aiMsgId) {
-  if (isStreaming) return;
-  var idx = chatHistory.findIndex(function(m) { return m.id === aiMsgId; });
-  if (idx < 0) return;
-  var userMsg = null;
-  for (var i = idx - 1; i >= 0; i--) {
-    if (chatHistory[i].role === 'user') { userMsg = chatHistory[i]; break; }
-  }
-  if (!userMsg) return;
-  chatHistory = chatHistory.slice(0, idx);
-  saveHistory();
-  reRenderChat();
-  sendMessageWithText(userMsg.text, false);
-}
-
-function reRenderChat() {
-  msgContainer.innerHTML = '';
-  if (chatHistory.length === 0) {
-    var w = document.createElement('div'); w.className = 'welcome'; w.id = 'welcome';
-    var avatarData = localStorage.getItem(KEYS.avatar);
-    if (avatarData) {
-      var av = document.createElement('img'); av.className = 'welcome-avatar'; av.src = avatarData;
-      w.appendChild(av);
-    }
-    var txt = document.createElement('div'); txt.className = 'welcome-text'; txt.innerHTML = '我在这里<br>随时可以开始';
-    w.appendChild(txt);
-    msgContainer.appendChild(w);
-    return;
-  }
-  lastMessageTime = null;
-  for (var i = 0; i < chatHistory.length; i++) {
-    addTimeDivider(new Date(chatHistory[i].time));
-    renderMessage(chatHistory[i].role, chatHistory[i].text, chatHistory[i].id, false);
-  }
-  scrollToBottom();
-}
-
-// TTS Voice
-function stripParentheses(text) {
-  return text.replace(/[\uff08\u0028][^\uff09\u0029]*[\uff09\u0029]/g, '').replace(/\*[^*]*\*/g, '').trim();
-}
-
-function resetPlayBtn() {
-  if (activeBtn) {
-    activeBtn.classList.remove('audio-playing');
-    activeBtn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>播放';
-    activeBtn = null;
-  }
-}
-
-function playVoice(text, btn) {
-  audioEl.pause();
-  resetPlayBtn();
-  var cleanText = stripParentheses(text);
-  if (!cleanText) { showToast('没有可播放的文本'); return; }
-
-  if (btn) {
-    activeBtn = btn;
-    btn.classList.add('audio-playing');
-    btn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>播放中';
-  }
-
-  fetch('/api/tts', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      text: cleanText,
-      appid: config.ttsAppId,
-      token: config.ttsToken,
-      voice_type: config.ttsSpeaker,
-      cluster: 'volcano_icl'
-    })
-  })
-  .then(function(res) {
-    if (!res.ok) return res.text().then(function(t) { throw new Error('HTTP ' + res.status + ': ' + t); });
-    return res.json();
-  })
-  .then(function(result) {
-    // 后端成功码：旧版是 3000，新版是 0，两个都认
-    var ok = (result.code === 3000 || result.code === 0);
-    var payload = result.data || result.audio;
-    if (ok && payload) {
-      var raw = atob(payload);
-      var arr = new Uint8Array(raw.length);
-      for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
-      var blob = new Blob([arr], { type: 'audio/mpeg' });
-      var url = URL.createObjectURL(blob);
-
-      if (lastBlobUrl) { URL.revokeObjectURL(lastBlobUrl); }
-      lastBlobUrl = url;
-
-      audioEl.onended = function() { resetPlayBtn(); };
-      audioEl.src = url;
-      currentAudio = audioEl;
-
-      var p = audioEl.play();
-      if (p && typeof p.catch === 'function') {
-        p.catch(function() {
-          resetPlayBtn();
-          showToast('浏览器拦下了这次自动播放，手动点一下播放键');
-        });
-      }
-    } else {
-      throw new Error('TTS code: ' + result.code + ' msg: ' + (result.message || 'unknown'));
-    }
-  })
-  .catch(function(err) {
-    console.error('TTS error:', err);
-    resetPlayBtn();
-    showToast('语音: ' + err.message);
-  });
-}
-
-// Send message
-function sendMessage() {
-  var text = inputField.value.trim();
-  if (!text || isStreaming) return;
-  inputField.value = ''; inputField.style.height = 'auto'; btnSend.classList.remove('active');
-  sendMessageWithText(text, true);
-}
-
-function sendMessageWithText(text, addToHist) {
-  if (!config.botId || !config.token) { showToast('请先配置 Bot ID 和 Token'); toggleConfig(true); return; }
-  unlockAudio();  // 借这次操作的手势，提前拿到播放许可
-  if (addToHist) addMessage('user', text);
-
-  var timeDiff = getTimeDiffText();
-  var now = new Date();
-  var timeStr = now.toLocaleString('zh-CN', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
-  var ctx = '[当前时间: ' + timeStr + ']';
-  if (timeDiff) ctx += ' [距离上次对话已过去: ' + timeDiff + ']';
-  var fullMessage = ctx + '\n' + text;
-
-  isStreaming = true;
-  var streamResult = addStreamingMessage();
-  var bubble = streamResult.bubble;
-  var msgId = streamResult.id;
-  var content = streamResult.content;
-
-  streamChat(fullMessage, bubble)
-  .then(function(fullText) {
-    chatHistory.push({ role: 'ai', text: fullText, id: msgId, time: Date.now() });
-    saveHistory();
-
-    var actions = document.createElement('div'); actions.className = 'msg-actions';
-    if (config.ttsAppId && config.ttsToken && config.ttsSpeaker) {
-      var playBtn = document.createElement('button'); playBtn.className = 'msg-action-btn';
-      playBtn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>播放';
-      playBtn.onclick = function() { playVoice(fullText, playBtn); };
-      actions.appendChild(playBtn);
-
-      // Auto-play voice
-      setTimeout(function() { playVoice(fullText, playBtn); }, 300);
-    }
-    var regenBtn = document.createElement('button'); regenBtn.className = 'msg-action-btn';
-    regenBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>重新生成';
-    regenBtn.onclick = function() { regenerateMessage(msgId); };
-    actions.appendChild(regenBtn);
-    content.appendChild(actions);
-
-    isStreaming = false;
-    updateLastActive();
-  })
-  .catch(function(err) {
-    console.error(err);
-    var t = document.getElementById('typing'); if (t) t.remove();
-    bubble.textContent = '连接出了点问题，再试一次？';
-    showToast(err.message || '请求失败');
-    isStreaming = false;
-    updateLastActive();
-  });
-}
-
-// Coze streaming
-function streamChat(message, bubble) {
-  return new Promise(function(resolve, reject) {
-    var body = {
-      bot_id: config.botId, user_id: USER_ID, stream: true, auto_save_history: true,
-      additional_messages: [{ role: 'user', content: message, content_type: 'text' }]
-    };
-    if (conversationId) body.conversation_id = conversationId;
-
-    fetch('/api/chat', {
+    const cozeRes = await fetch(url, {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + config.token, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-    .then(function(response) {
-      if (!response.ok) throw new Error('API 错误: ' + response.status);
-      var reader = response.body.getReader();
-      var decoder = new TextDecoder();
-      var buffer = '';
-      var fullText = '';
-      var typingRemoved = false;
-      var currentEvent = '';
+      headers: {
+        'Authorization': token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        bot_id,
+        user_id,
+        stream: true,
+        auto_save_history: auto_save_history !== false,
+        additional_messages
+      })
+    });
 
-      function read() {
-        reader.read().then(function(result) {
-          if (result.done) {
-            if (!typingRemoved) { var t = document.getElementById('typing'); if (t) t.remove(); if (!fullText) { fullText = '...'; bubble.textContent = fullText; } }
-            resolve(fullText);
-            return;
-          }
-          buffer += decoder.decode(result.value, { stream: true });
-          var lines = buffer.split('\n');
-          buffer = lines.pop() || '';
+    console.log('[chat] Coze 响应状态', cozeRes.status);
 
-          for (var i = 0; i < lines.length; i++) {
-            var line = lines[i];
-            if (line.indexOf('event:') === 0) { currentEvent = line.substring(6).trim(); continue; }
-            if (line.indexOf('data:') === 0) {
-              var d = line.substring(5).trim();
-              if (d === '[DONE]') continue;
-              try {
-                var data = JSON.parse(d);
-                if (data.conversation_id) { conversationId = data.conversation_id; localStorage.setItem(KEYS.convId, conversationId); }
-                if (currentEvent === 'conversation.message.delta' && data.type === 'answer' && data.content) {
-                  if (!typingRemoved) { var t = document.getElementById('typing'); if (t) t.remove(); typingRemoved = true; }
-                  fullText += data.content;
-                  bubble.textContent = fullText;
-                  scrollToBottom();
-                }
-              } catch(e) {}
+    if (!cozeRes.ok) {
+      const errText = await cozeRes.text();
+      console.log('[chat] Coze 报错正文', errText.slice(0, 1000));
+      return new Response(errText, {
+        status: cozeRes.status,
+        headers: { ...corsHeaders }
+      });
+    }
+
+    if (!cozeRes.body) {
+      console.log('[chat] Coze 返回了 200 但 body 是空的');
+      return new Response(
+        JSON.stringify({ error: 'Coze 返回了空的响应体' }),
+        {
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // 边转发边偷看：原样传给前端，同时把内容打到 Vercel 日志里
+    const decoder = new TextDecoder();
+    let seen = '';
+    let deltaChars = 0;
+    let logCalls = 0;
+
+    const peeker = new TransformStream({
+      transform(chunk, controller) {
+        controller.enqueue(chunk);
+
+        try {
+          const piece = decoder.decode(chunk, { stream: true });
+          seen += piece;
+
+          // 数一数真正的正文有多少字
+          for (const line of piece.split('\n')) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data:')) continue;
+
+            const payload = trimmed.slice(5).trim();
+            if (!payload || payload === '[DONE]') continue;
+
+            try {
+              const obj = JSON.parse(payload);
+              if (typeof obj.content === 'string' && obj.type === 'answer') {
+                deltaChars += obj.content.length;
+              }
+            } catch {
+              // 不是 JSON 就算了
             }
           }
-          read();
-        }).catch(reject);
-      }
-      read();
-    })
-    .catch(reject);
-  });
-}
 
-document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'hidden') updateLastActive(); });
-updateLastActive();
-initUI();
-</script>
-</body>
-</html>
+          // 前几段原样打出来，看看 Coze 到底说了什么
+          if (logCalls < 8) {
+            logCalls++;
+            console.log(`[chat] 流片段 ${logCalls}`, piece.slice(0, 800));
+          }
+        } catch {
+          // 偷看失败不能影响转发
+        }
+      },
+
+      flush() {
+        console.log('[chat] 流结束', JSON.stringify({
+          total_bytes: seen.length,
+          answer_chars: deltaChars
+        }));
+
+        if (deltaChars === 0) {
+          console.log('[chat] 一个字都没有，完整原文如下');
+          console.log(seen.slice(0, 4000));
+        }
+      }
+    });
+
+    return new Response(cozeRes.body.pipeThrough(peeker), {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
+    });
+  } catch (err) {
+    console.log('[chat] 函数抛异常', err && err.message);
+    return new Response(
+      JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+}
