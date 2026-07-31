@@ -163,6 +163,12 @@ var isStreaming = false;
 var chatHistory = loadHistory();
 var currentAudio = null;
 var audioUnlocked = false;
+// iOS 的播放许可是发给"某一个 audio 元素"的，不是发给整个页面。
+// 所以全站只用这一个元素，解锁它之后，自动播放才放得出来。
+var audioEl = new Audio();
+audioEl.preload = 'auto';
+var activeBtn = null;
+var lastBlobUrl = null;
 var uid = localStorage.getItem(KEYS.uid);
 if (!uid) { uid = 'u_' + Date.now(); localStorage.setItem(KEYS.uid, uid); }
 var USER_ID = uid;
@@ -261,14 +267,22 @@ inputField.addEventListener('keydown', function(e) {
 });
 btnSend.addEventListener('click', sendMessage);
 
-// Unlock audio on first user interaction
-document.addEventListener('click', function() {
-  if (!audioUnlocked) {
-    var silence = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dX/////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+M4xAANaAKsAAAAACIAA/8AAAAAT//M4xBAAAA0gAAAAAPE');
-    silence.play().catch(function(){});
-    audioUnlocked = true;
-  }
-}, { once: true });
+// Unlock audio on first user interaction.
+// 关键：解锁的必须是 audioEl 本身，而不是另建一个临时元素。
+var SILENCE = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAbAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dX/////////////////////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+M4xAANaAKsAAAAACIAA/8AAAAAT//M4xBAAAA0gAAAAAPE';
+function unlockAudio() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  try {
+    audioEl.src = SILENCE;
+    var p = audioEl.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(function() { audioUnlocked = false; });
+    }
+  } catch (e) { audioUnlocked = false; }
+}
+document.addEventListener('click', unlockAudio);
+document.addEventListener('touchend', unlockAudio);
 
 function formatTime(d) { return d.toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit', hour12:false }); }
 function formatTimeDiff(ms) {
@@ -446,12 +460,22 @@ function stripParentheses(text) {
   return text.replace(/[\uff08\u0028][^\uff09\u0029]*[\uff09\u0029]/g, '').replace(/\*[^*]*\*/g, '').trim();
 }
 
+function resetPlayBtn() {
+  if (activeBtn) {
+    activeBtn.classList.remove('audio-playing');
+    activeBtn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>播放';
+    activeBtn = null;
+  }
+}
+
 function playVoice(text, btn) {
-  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  audioEl.pause();
+  resetPlayBtn();
   var cleanText = stripParentheses(text);
   if (!cleanText) { showToast('没有可播放的文本'); return; }
 
   if (btn) {
+    activeBtn = btn;
     btn.classList.add('audio-playing');
     btn.innerHTML = '<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>播放中';
   }
@@ -472,32 +496,37 @@ function playVoice(text, btn) {
     return res.json();
   })
   .then(function(result) {
-    if (result.code === 3000 && result.data) {
-      var raw = atob(result.data);
+    // 后端成功码：旧版是 3000，新版是 0，两个都认
+    var ok = (result.code === 3000 || result.code === 0);
+    var payload = result.data || result.audio;
+    if (ok && payload) {
+      var raw = atob(payload);
       var arr = new Uint8Array(raw.length);
       for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
-      var blob = new Blob([arr], { type: 'audio/mp3' });
+      var blob = new Blob([arr], { type: 'audio/mpeg' });
       var url = URL.createObjectURL(blob);
-      currentAudio = new Audio(url);
-      currentAudio.play();
-      currentAudio.onended = function() {
-        if (btn) {
-          btn.classList.remove('audio-playing');
-          btn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>播放';
-        }
-        URL.revokeObjectURL(url);
-        currentAudio = null;
-      };
+
+      if (lastBlobUrl) { URL.revokeObjectURL(lastBlobUrl); }
+      lastBlobUrl = url;
+
+      audioEl.onended = function() { resetPlayBtn(); };
+      audioEl.src = url;
+      currentAudio = audioEl;
+
+      var p = audioEl.play();
+      if (p && typeof p.catch === 'function') {
+        p.catch(function() {
+          resetPlayBtn();
+          showToast('浏览器拦下了这次自动播放，手动点一下播放键');
+        });
+      }
     } else {
       throw new Error('TTS code: ' + result.code + ' msg: ' + (result.message || 'unknown'));
     }
   })
   .catch(function(err) {
     console.error('TTS error:', err);
-    if (btn) {
-      btn.classList.remove('audio-playing');
-      btn.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>播放';
-    }
+    resetPlayBtn();
     showToast('语音: ' + err.message);
   });
 }
@@ -512,6 +541,7 @@ function sendMessage() {
 
 function sendMessageWithText(text, addToHist) {
   if (!config.botId || !config.token) { showToast('请先配置 Bot ID 和 Token'); toggleConfig(true); return; }
+  unlockAudio();  // 借这次操作的手势，提前拿到播放许可
   if (addToHist) addMessage('user', text);
 
   var timeDiff = getTimeDiffText();
